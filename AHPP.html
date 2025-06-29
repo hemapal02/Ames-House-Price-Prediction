@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>House Price Analysis Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: scale(1.05);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        select, input {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .feature-importance {
+            display: grid;
+            gap: 10px;
+        }
+
+        .feature-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-name {
+            min-width: 120px;
+            font-weight: 500;
+        }
+
+        .bar {
+            flex: 1;
+            height: 25px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .correlation-matrix {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 5px;
+            margin: 20px 0;
+        }
+
+        .correlation-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .missing-data {
+            display: grid;
+            gap: 10px;
+        }
+
+        .missing-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #dc3545;
+        }
+
+        .outlier-controls {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 House Price Analysis Dashboard</h1>
+            <p>Interactive Data Analysis & Visualization</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalHouses">1,460</div>
+                <div class="stat-label">Total Houses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgPrice">$180,921</div>
+                <div class="stat-label">Average Price</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="medianPrice">$163,000</div>
+                <div class="stat-label">Median Price</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="outliers">31</div>
+                <div class="stat-label">Outliers Removed</div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Price Distribution -->
+            <div class="card">
+                <h3>📊 Sale Price Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="priceDistribution"></canvas>
+                </div>
+            </div>
+
+            <!-- Feature Importance -->
+            <div class="card">
+                <h3>🎯 Top Features by Correlation</h3>
+                <div class="feature-importance" id="featureImportance"></div>
+            </div>
+
+            <!-- Correlation Heatmap -->
+            <div class="card full-width">
+                <h3>🔗 Feature Correlation Matrix</h3>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Select Features:</label>
+                        <select id="featureSelector" multiple>
+                            <option value="OverallQual" selected>Overall Quality</option>
+                            <option value="GrLivArea" selected>Living Area</option>
+                            <option value="GarageArea" selected>Garage Area</option>
+                            <option value="TotalBsmtSF" selected>Basement SF</option>
+                            <option value="YearBuilt" selected>Year Built</option>
+                            <option value="TotRmsAbvGrd" selected>Total Rooms</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="correlationHeatmap"></div>
+            </div>
+
+            <!-- Scatter Plot Analysis -->
+            <div class="card">
+                <h3>📈 Feature vs Price Analysis</h3>
+                <div class="controls">
+                    <div class="control-group">
+                        <label>X-Axis Feature:</label>
+                        <select id="xAxisSelect">
+                            <option value="OverallQual">Overall Quality</option>
+                            <option value="GrLivArea">Living Area</option>
+                            <option value="GarageArea">Garage Area</option>
+                            <option value="YearBuilt">Year Built</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="scatterPlot"></canvas>
+                </div>
+            </div>
+
+            <!-- Missing Data Analysis -->
+            <div class="card">
+                <h3>❌ Missing Data Analysis</h3>
+                <div class="missing-data" id="missingData"></div>
+            </div>
+
+            <!-- Outlier Detection -->
+            <div class="card">
+                <h3>🎯 Outlier Detection & Removal</h3>
+                <div class="outlier-controls">
+                    <p><strong>IQR Method Applied:</strong></p>
+                    <p>Boundary: Q3 + 3×IQR = $424,100</p>
+                    <p>Houses removed: 31 outliers</p>
+                    <button class="btn" onclick="showOutlierDetails()">View Details</button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="boxPlot"></canvas>
+                </div>
+            </div>
+
+            <!-- Feature Removal Summary -->
+            <div class="card full-width">
+                <h3>🧹 Feature Engineering Summary</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                    <div>
+                        <h4 style="color: #dc3545; margin-bottom: 10px;">Multicollinear Features Removed:</h4>
+                        <ul style="list-style: none; padding: 0;">
+                            <li>• GarageCars (corr. with GarageArea)</li>
+                            <li>• 1stFlrSF (corr. with TotalBsmtSF)</li>
+                            <li>• GrLivArea (corr. with TotRmsAbvGrd)</li>
+                            <li>• FullBath (corr. with GrLivArea)</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 style="color: #fd7e14; margin-bottom: 10px;">High Missing Values (>20%):</h4>
+                        <ul style="list-style: none; padding: 0;">
+                            <li>• FireplaceQu (47% missing)</li>
+                            <li>• Fence (80% missing)</li>
+                            <li>• Alley (90% missing)</li>
+                            <li>• MiscFeature (90% missing)</li>
+                            <li>• PoolQC (90% missing)</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 style="color: #6c757d; margin-bottom: 10px;">Low Correlation Features:</h4>
+                        <ul style="list-style: none; padding: 0;">
+                            <li>• LotFrontage, WoodDeckSF</li>
+                            <li>• 2ndFlrSF, OpenPorchSF</li>
+                            <li>• PoolArea, MoSold</li>
+                            <li>• YrSold, OverallCond</li>
+                            <li>• And 15 more...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample data generation for demonstration
+        const sampleData = {
+            prices: Array.from({length: 1429}, () => Math.random() * 400000 + 50000),
+            overallQual: Array.from({length: 1429}, () => Math.floor(Math.random() * 10) + 1),
+            grLivArea: Array.from({length: 1429}, () => Math.random() * 3000 + 500),
+            garageArea: Array.from({length: 1429}, () => Math.random() * 800 + 200),
+            yearBuilt: Array.from({length: 1429}, () => Math.floor(Math.random() * 80) + 1940)
+        };
+
+        // Top correlated features
+        const topFeatures = [
+            {name: 'OverallQual', correlation: 0.79},
+            {name: 'GrLivArea', correlation: 0.71},
+            {name: 'GarageArea', correlation: 0.62},
+            {name: 'TotalBsmtSF', correlation: 0.61},
+            {name: 'YearBuilt', correlation: 0.52},
+            {name: 'TotRmsAbvGrd', correlation: 0.53}
+        ];
+
+        // Missing data info
+        const missingDataInfo = [
+            {feature: 'LotFrontage', missing: 259, percentage: 18},
+            {feature: 'BsmtCond', missing: 37, percentage: 3},
+            {feature: 'BsmtQual', missing: 37, percentage: 3},
+            {feature: 'FireplaceQu', missing: 690, percentage: 47},
+            {feature: 'GarageType', missing: 81, percentage: 6}
+        ];
+
+        // Initialize Price Distribution Chart
+        function initPriceDistribution() {
+            const ctx = document.getElementById('priceDistribution').getContext('2d');
+            
+            // Create histogram data
+            const bins = 20;
+            const min = Math.min(...sampleData.prices);
+            const max = Math.max(...sampleData.prices);
+            const binWidth = (max - min) / bins;
+            const binCounts = new Array(bins).fill(0);
+            const binLabels = [];
+
+            for (let i = 0; i < bins; i++) {
+                binLabels.push(`$${Math.round((min + i * binWidth) / 1000)}k`);
+            }
+
+            sampleData.prices.forEach(price => {
+                const binIndex = Math.min(Math.floor((price - min) / binWidth), bins - 1);
+                binCounts[binIndex]++;
+            });
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: binLabels,
+                    datasets: [{
+                        label: 'Frequency',
+                        data: binCounts,
+                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Count'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Sale Price'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize Feature Importance
+        function initFeatureImportance() {
+            const container = document.getElementById('featureImportance');
+            
+            topFeatures.forEach(feature => {
+                const featureDiv = document.createElement('div');
+                featureDiv.className = 'feature-bar';
+                
+                const width = Math.abs(feature.correlation) * 100;
+                
+                featureDiv.innerHTML = `
+                    <div class="feature-name">${feature.name}</div>
+                    <div class="bar" style="width: ${width}%"></div>
+                    <span>${feature.correlation.toFixed(2)}</span>
+                `;
+                
+                container.appendChild(featureDiv);
+            });
+        }
+
+        // Initialize Missing Data
+        function initMissingData() {
+            const container = document.getElementById('missingData');
+            
+            missingDataInfo.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'missing-item';
+                
+                itemDiv.innerHTML = `
+                    <span><strong>${item.feature}</strong></span>
+                    <span>${item.missing} missing (${item.percentage}%)</span>
+                `;
+                
+                container.appendChild(itemDiv);
+            });
+        }
+
+        // Initialize Scatter Plot
+        function initScatterPlot() {
+            const ctx = document.getElementById('scatterPlot').getContext('2d');
+            let currentChart = null;
+
+            function updateScatterPlot(xFeature) {
+                if (currentChart) {
+                    currentChart.destroy();
+                }
+
+                const xData = sampleData[xFeature] || sampleData.overallQual;
+                const yData = sampleData.prices;
+                
+                const scatterData = xData.map((x, i) => ({x: x, y: yData[i]}));
+
+                currentChart = new Chart(ctx, {
+                    type: 'scatter',
+                    data: {
+                        datasets: [{
+                            label: 'Houses',
+                            data: scatterData,
+                            backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                            borderColor: 'rgba(102, 126, 234, 1)',
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: xFeature
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Sale Price ($)'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Initial plot
+            updateScatterPlot('overallQual');
+
+            // Update on selection change
+            document.getElementById('xAxisSelect').addEventListener('change', (e) => {
+                const featureMap = {
+                    'OverallQual': 'overallQual',
+                    'GrLivArea': 'grLivArea',
+                    'GarageArea': 'garageArea',
+                    'YearBuilt': 'yearBuilt'
+                };
+                updateScatterPlot(featureMap[e.target.value]);
+            });
+        }
+
+        // Initialize Box Plot
+        function initBoxPlot() {
+            const ctx = document.getElementById('boxPlot').getContext('2d');
+            
+            // Calculate quartiles
+            const sortedPrices = [...sampleData.prices].sort((a, b) => a - b);
+            const q1 = sortedPrices[Math.floor(sortedPrices.length * 0.25)];
+            const q2 = sortedPrices[Math.floor(sortedPrices.length * 0.5)];
+            const q3 = sortedPrices[Math.floor(sortedPrices.length * 0.75)];
+            const iqr = q3 - q1;
+            const lowerBound = q1 - 1.5 * iqr;
+            const upperBound = q3 + 1.5 * iqr;
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Q1', 'Q2', 'Q3', 'Upper Bound'],
+                    datasets: [{
+                        label: 'Price Quartiles',
+                        data: [q1, q2, q3, upperBound],
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.8)',
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 205, 86, 0.8)',
+                            'rgba(75, 192, 192, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Price ($)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize Correlation Heatmap
+        function initCorrelationHeatmap() {
+            const container = document.getElementById('correlationHeatmap');
+            
+            // Sample correlation matrix
+            const correlationMatrix = [
+                [1.00, 0.79, 0.62, 0.61, 0.52, 0.53],
+                [0.79, 1.00, 0.48, 0.45, 0.39, 0.41],
+                [0.62, 0.48, 1.00, 0.38, 0.35, 0.37],
+                [0.61, 0.45, 0.38, 1.00, 0.33, 0.35],
+                [0.52, 0.39, 0.35, 0.33, 1.00, 0.31],
+                [0.53, 0.41, 0.37, 0.35, 0.31, 1.00]
+            ];
+
+            const features = ['SalePrice', 'OverallQual', 'GarageArea', 'TotalBsmtSF', 'YearBuilt', 'TotRmsAbvGrd'];
+            
+            container.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = 'correlation-matrix';
+            
+            correlationMatrix.forEach((row, i) => {
+                row.forEach((value, j) => {
+                    const cell = document.createElement('div');
+                    cell.className = 'correlation-cell';
+                    cell.textContent = value.toFixed(2);
+                    
+                    const intensity = Math.abs(value);
+                    const hue = value > 0 ? 200 : 0; // Blue for positive, red for negative
+                    cell.style.backgroundColor = `hsla(${hue}, 70%, 50%, ${intensity})`;
+                    
+                    grid.appendChild(cell);
+                });
+            });
+            
+            container.appendChild(grid);
+        }
+
+        // Show outlier details
+        function showOutlierDetails() {
+            alert('Outlier Details:\n\n• Method: IQR (Interquartile Range)\n• Threshold: Q3 + 3×IQR\n• Boundary: $424,100\n• Houses removed: 31\n• Original dataset: 1,460 houses\n• Clean dataset: 1,429 houses');
+        }
+
+        // Initialize all components
+        document.addEventListener('DOMContentLoaded', function() {
+            initPriceDistribution();
+            initFeatureImportance();
+            initMissingData();
+            initScatterPlot();
+            initBoxPlot();
+            initCorrelationHeatmap();
+        });
+    </script>
+</body>
+</html>
